@@ -41,6 +41,9 @@ class Venue(db.Model):
     genres = db.Column(db.String(120), nullable=False)
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
+    website = db.Column(db.String(120))
+    seeking_talent = db.Column(db.Boolean)
+    seeking_description = db.Column(db.String(500))
 
     shows = db.relationship('Show', lazy=True)
 
@@ -57,8 +60,13 @@ class Artist(db.Model):
     genres = db.Column(db.String(120), nullable=False)
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
+    website = db.Column(db.String(120))
+    seeking_talent = db.Column(db.Boolean)
+    seeking_description = db.Column(db.String(500))
 
     shows = db.relationship('Show', lazy=True)
+
+    
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -68,9 +76,12 @@ class Show(db.Model):
   __tablename__ = 'Show'
 
   show_id = db.Column(db.Integer, primary_key=True)
-  venue_id = db.Column(db.Integer, db.ForeignKey('venue.id'), nullable=False)
+  venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=False)
   artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=False)
   start_time = db.Column(db.DateTime, nullable=False)
+
+  venue = db.relationship('Venue', lazy=True)
+  artist = db.relationship('Artist', lazy=True)
 
 
 #----------------------------------------------------------------------------#
@@ -124,6 +135,7 @@ def venues():
       "num_upcoming_shows": 0,
     }]
   }]
+  #return render_template('pages/venues.html', areas=data);
   return render_template('pages/venues.html', areas=data);
 
 @app.route('/venues/search', methods=['POST'])
@@ -362,6 +374,8 @@ def show_artist(artist_id):
     "upcoming_shows_count": 3,
   }
   data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
+  # data = Artist.query.get(artist_id)
+  # data.genres = data.genres.replace('{','').replace('}','').split(',')
   return render_template('pages/show_artist.html', artist=data)
 
 #  Update
