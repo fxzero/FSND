@@ -13,6 +13,7 @@ from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
 from flask_migrate import Migrate
+import datetime
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -47,6 +48,9 @@ class Venue(db.Model):
 
     shows = db.relationship('Show', lazy=True)
 
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
 class Artist(db.Model):
@@ -66,6 +70,9 @@ class Artist(db.Model):
 
     shows = db.relationship('Show', lazy=True)
 
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
     
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
@@ -82,6 +89,9 @@ class Show(db.Model):
 
   venue = db.relationship('Venue', lazy=True)
   artist = db.relationship('Artist', lazy=True)
+
+  def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
 #----------------------------------------------------------------------------#
@@ -143,14 +153,19 @@ def search_venues():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
-  response={
-    "count": 1,
-    "data": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 1,
-    }]
-  }
+  # response={
+  #   "count": 1,
+  #   "data": [{
+  #     "id": 2,
+  #     "name": "The Dueling Pianos Bar",
+  #     "num_upcoming_shows": 1,
+  #   }]
+  # }
+  response = {}
+  search_term=request.form.get('search_term', '')
+  result = Venue.query.filter(Venue.name.ilike(f'%{search_term}%'))
+  response['count'] = result.count()
+  response['data'] = result.all()
   return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
 @app.route('/venues/<int:venue_id>')
@@ -234,7 +249,12 @@ def show_venue(venue_id):
     "past_shows_count": 1,
     "upcoming_shows_count": 1,
   }
-  data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
+  # data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
+  result = Venue.query.filter_by(id = venue_id).first()
+  data = result.to_dict()
+  data['genres'] = data['genres'].replace('{', '').replace('}', '').split(',')
+  past_shows = [s for s in result.shows if s.start_time < datetime.datetime.now()]
+  # data['past_shows'] = past_shows
   return render_template('pages/show_venue.html', venue=data)
 
 #  Create Venue
