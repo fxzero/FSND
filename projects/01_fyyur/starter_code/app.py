@@ -99,7 +99,10 @@ class Show(db.Model):
 #----------------------------------------------------------------------------#
 
 def format_datetime(value, format='medium'):
-  date = dateutil.parser.parse(value)
+  if type(value) == datetime.datetime:
+    date = value
+  else:
+    date = dateutil.parser.parse(value)
   if format == 'full':
       format="EEEE MMMM, d, y 'at' h:mma"
   elif format == 'medium':
@@ -145,8 +148,15 @@ def venues():
       "num_upcoming_shows": 0,
     }]
   }]
-  #return render_template('pages/venues.html', areas=data);
-  return render_template('pages/venues.html', areas=data);
+  city_state_list = Venue.query.with_entities(Venue.city, Venue.state).distinct().all()
+  data = []
+  for cs in city_state_list:
+    d = {}
+    d['city'] = cs[0]
+    d['state'] = cs[1]
+    d['venues'] = Venue.query.filter_by(city = cs[0], state = cs[1])
+    data.append(d)
+  return render_template('pages/venues.html', areas=data)
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
@@ -250,11 +260,22 @@ def show_venue(venue_id):
     "upcoming_shows_count": 1,
   }
   # data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
+  def process_shows_data(shows_data):
+    shows = []
+    for s in shows_data:
+      show = s.to_dict()
+      show['artist_name'] = s.artist.name
+      show['artist_image_link'] = s.artist.image_link
+      shows.append(show)
+    return shows
+
   result = Venue.query.filter_by(id = venue_id).first()
   data = result.to_dict()
   data['genres'] = data['genres'].replace('{', '').replace('}', '').split(',')
-  past_shows = [s for s in result.shows if s.start_time < datetime.datetime.now()]
-  # data['past_shows'] = past_shows
+  past_shows_data = [s for s in result.shows if s.start_time < datetime.datetime.now()]
+  upcoming_shows_data = [s for s in result.shows if s.start_time >= datetime.datetime.now()]
+  data['past_shows'] = process_shows_data(past_shows_data)
+  data['upcoming_shows'] = process_shows_data(upcoming_shows_data)
   return render_template('pages/show_venue.html', venue=data)
 
 #  Create Venue
@@ -269,9 +290,30 @@ def create_venue_form():
 def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
-
+  error = False
+  try:
+    venue = Venue(
+      name=request.form['name'],
+      city=request.form['city'],
+      state=request.form['state'],
+      address=request.form['address'],
+      phone=request.form['phone'],
+      genres=request.form['genres'],
+      #image_link=request.form['image_link'],
+      facebook_link=request.form['facebook_link']
+      )
+    db.session.add(venue)
+    db.session.commit()
+  except:
+    error = True
+    db.session.rollback()
+  finally:
+    db.session.close()
   # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
+  if not error:
+    flash('Venue ' + request.form['name'] + ' was successfully listed!')
+  else:
+    flash('An error occurred. Venue ' + request.form['name'] + ' could not be listed.')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
@@ -281,10 +323,24 @@ def create_venue_submission():
 def delete_venue(venue_id):
   # TODO: Complete this endpoint for taking a venue_id, and using
   # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
-
+  error = False
+  venue_name = Venue.query.filter_by(id=venue_id).first().name
+  try:
+    Venue.query.filter_by(id=venue_id).delete()
+    db.session.commit()
+  except:
+    error = True
+    db.session.rollback()
+  finally:
+    db.session.close()
+  # on successful db insert, flash success
+  if not error:
+    flash('Venue ' + venue_name + ' was successfully deleted!')
+  else:
+    flash('An error occurred. Venue ' + venue_name + ' could not be deleted.')
   # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
   # clicking that button delete it from the db then redirect the user to the homepage
-  return None
+  return render_template('pages/home.html')
 
 #  Artists
 #  ----------------------------------------------------------------
@@ -301,6 +357,7 @@ def artists():
     "id": 6,
     "name": "The Wild Sax Band",
   }]
+  data = Artist.query.all()
   return render_template('pages/artists.html', artists=data)
 
 @app.route('/artists/search', methods=['POST'])
@@ -316,6 +373,11 @@ def search_artists():
       "num_upcoming_shows": 0,
     }]
   }
+  response = {}
+  search_term=request.form.get('search_term', '')
+  result = Artist.query.filter(Artist.name.ilike(f'%{search_term}%'))
+  response['count'] = result.count()
+  response['data'] = result.all()
   return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
 
 @app.route('/artists/<int:artist_id>')
@@ -393,9 +455,23 @@ def show_artist(artist_id):
     "past_shows_count": 0,
     "upcoming_shows_count": 3,
   }
-  data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
-  # data = Artist.query.get(artist_id)
-  # data.genres = data.genres.replace('{','').replace('}','').split(',')
+  # data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
+  def process_shows_data(shows_data):
+    shows = []
+    for s in shows_data:
+      show = s.to_dict()
+      show['venue_name'] = s.venue.name
+      show['venue_image_link'] = s.venue.image_link
+      shows.append(show)
+    return shows
+
+  result = Artist.query.filter_by(id = artist_id).first()
+  data = result.to_dict()
+  data['genres'] = data['genres'].replace('{', '').replace('}', '').split(',')
+  past_shows_data = [s for s in result.shows if s.start_time < datetime.datetime.now()]
+  upcoming_shows_data = [s for s in result.shows if s.start_time >= datetime.datetime.now()]
+  data['past_shows'] = process_shows_data(past_shows_data)
+  data['upcoming_shows'] = process_shows_data(upcoming_shows_data)
   return render_template('pages/show_artist.html', artist=data)
 
 #  Update
