@@ -1,1 +1,1 @@
-/anaconda3/lib/python3.7/ntpath.py
+/Users/zero/anaconda3/lib/python3.7/ntpath.py

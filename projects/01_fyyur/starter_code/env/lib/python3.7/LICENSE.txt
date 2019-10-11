@@ -1,1 +1,1 @@
-/anaconda3/lib/python3.7/LICENSE.txt
+/Users/zero/anaconda3/lib/python3.7/LICENSE.txt

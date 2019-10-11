@@ -1,1 +1,1 @@
-/anaconda3/lib/python3.7/stat.py
+/Users/zero/anaconda3/lib/python3.7/stat.py
